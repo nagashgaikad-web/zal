@@ -2,7 +2,7 @@
    Хранит всё в телефоне и отправляет в закрытый репозиторий GitHub; тренер разбирает тренировку вечером. */
 (() => {
 "use strict";
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 
 /* ---------------- утилиты ---------------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -178,6 +178,7 @@ async function flush() {
       const it = OUT[p];
       await GH.put(p, it.d, it.msg, it.b64);
       if (OUT[p] && OUT[p].ts === it.ts) { delete OUT[p]; LS.set("outbox", OUT); }
+      const m = p.match(/^workouts\/(.+)\.json$/); if (m && HIST[m[1]] && SHAS[p]) { HIST[m[1]]._sha = SHAS[p]; LS.set("hist", HIST); }
     }
     SYNC.err = null; SYNC.lastPush = Date.now(); LS.set("lastPush", SYNC.lastPush);
   } catch (e) { SYNC.err = e; scheduleFlush(e.status === 401 || e.status === 404 ? 60000 : 12000); }
@@ -199,6 +200,10 @@ async function pull(opts = {}) {
       changed = true; if (isNew && !opts.silent) toast("Тренер прислал разбор: " + (COACH.title || "новая запись"), "ac", 4500);
     }
     const files = await GH.list("workouts");
+    const present = new Set(files.filter(f => /\.json$/.test(f.name)).map(f => f.name.replace(/\.json$/, "")));
+    for (const id of Object.keys(HIST)) { // тренировку удалили в GitHub — убираем и с телефона
+      if (!present.has(id) && HIST[id] && HIST[id]._sha && !OUT["workouts/" + id + ".json"] && !(SES && SES.id === id)) { delete HIST[id]; delete SHAS["workouts/" + id + ".json"]; changed = true; }
+    }
     for (const f of files) {
       if (!/\.json$/.test(f.name)) continue;
       const id = f.name.replace(/\.json$/, "");
