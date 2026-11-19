@@ -1,8 +1,8 @@
 /* Зал — дневник тренировок для телефона.
-   Хранит всё в телефоне и отправляет в закрытый репозиторий GitHub; тренер разбирает тренировку вечером. */
+   Хранит всё в телефоне и отправляет в закрытый репозиторий GitHub; тренер разбирает тренировку по расписанию. */
 (() => {
 "use strict";
-const VERSION = "1.0.1";
+const VERSION = "1.0.2";
 
 /* ---------------- утилиты ---------------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -66,9 +66,11 @@ const I = {
 
 /* ---------------- настройки ---------------- */
 const DEF_CFG = { owner: "", repo: "zal-data", token: "", branch: "main", api: "https://api.github.com",
-  restBase: 120, restIso: 90, sound: true, haptics: true, awake: true, treatment: true, coachTime: "23:00", skipOnb: false };
+  restBase: 120, restIso: 90, sound: true, haptics: true, awake: true, treatment: true, skipOnb: false };
 let CFG = Object.assign({}, DEF_CFG, LS.get("cfg", {}));
 const saveCfg = () => LS.set("cfg", CFG);
+let COACH_TIME = LS.get("coachTime", "14:00"); // время разбора — из zal-data/config.json
+function coachWhen() { const [h, m] = COACH_TIME.split(":").map(Number); const n = new Date(); return (n.getHours() * 60 + n.getMinutes() < h * 60 + m ? "сегодня" : "завтра") + " в " + COACH_TIME; }
 const EGD_DATE = "2027-01-11"; // контрольная ЭГДС — не раньше этой даты
 
 /* ---------------- программа по умолчанию (копия Дневника, v6) ---------------- */
@@ -192,7 +194,8 @@ async function pull(opts = {}) {
   pulling = true; renderSync();
   let changed = false;
   try {
-    const [p, c] = await Promise.all([GH.getJSON("program.json"), GH.getJSON("coach/latest.json")]);
+    const [p, c, cf] = await Promise.all([GH.getJSON("program.json"), GH.getJSON("coach/latest.json"), GH.getJSON("config.json")]);
+    if (cf && cf.data && cf.data.coachTime && cf.data.coachTime !== COACH_TIME) { COACH_TIME = cf.data.coachTime; LS.set("coachTime", COACH_TIME); changed = true; }
     if (p && p.data && JSON.stringify(p.data) !== JSON.stringify(PROG)) { PROG = p.data; LS.set("program", PROG); changed = true; }
     if (c && c.data && (!COACH || c.data.id !== COACH.id || c.data.date !== COACH.date)) {
       const isNew = !!COACH; COACH = c.data; LS.set("coach", COACH);
@@ -372,7 +375,7 @@ function viewHome() {
     (CFG.treatment && egd > 0 ? stat("До ЭГДС", egd + "<small>дн</small>", "не раньше " + pd(EGD_DATE).getDate() + " " + MON_S[pd(EGD_DATE).getMonth()]) : stat("Подходов", ws.reduce((t, w) => t + setCount(w), 0) + "", "за всё время")) + "</div>";
   // тренер
   const coach = COACH ? '<button class="card coach-card tap" data-go="coach"><div class="coach-head"><div class="avatar">' + I.coach + '</div><div><div class="t">' + esc(COACH.title || "Разбор тренировки") + '</div><div class="d">' + esc(COACH.date ? fmtShort(COACH.date) : "") + '</div></div></div><div class="clamp">' + esc(plainText(COACH.text)).slice(0, 400) + "</div></button>"
-    : '<div class="card"><div class="coach-head"><div class="avatar">' + I.coach + '</div><div><div class="t">Тренер</div><div class="d">Разбор — в ' + esc(CFG.coachTime) + ' в день тренировки</div></div></div><div class="muted" style="font-size:15px">После тренировки нажми «Завершить». Вечером здесь появится разбор и цели по весам на следующий раз.</div></div>';
+    : '<div class="card"><div class="coach-head"><div class="avatar">' + I.coach + '</div><div><div class="t">Тренер</div><div class="d">Разбор приходит в ' + esc(COACH_TIME) + '</div></div></div><div class="muted" style="font-size:15px">После тренировки нажми «Завершить». В ' + esc(COACH_TIME) + ' здесь появится разбор и цели по весам на следующий раз.</div></div>';
   return '<main class="view"><div class="top"><div><div class="eyebrow">' + esc(fmtLong(now)) + '</div><h1 class="lt">Сегодня</h1></div>' + syncPill() + "</div>" + hero + week + '<div class="sec-h"><h2>Тренер</h2></div>' + coach + '<div class="sec-h"><h2>Статистика</h2></div>' + stats + "</main>";
 }
 const stat = (l, v, s) => '<div class="stat"><div class="l">' + l + '</div><div class="v num">' + v + '</div><div class="l faint" style="margin-top:2px">' + esc(s) + "</div></div>";
@@ -461,7 +464,7 @@ function logSet() {
   else if (st.r > rg.hi && st.rir >= 2) hint = { k: "ac", t: "Повторов больше верхней границы (" + rg.hi + "). В следующем подходе можно +" + fmtW(stepFor(ex.id)) + " кг." };
   if (ex.sets.length >= ex.plan.sets) {
     const allTop = ex.sets.slice(0, ex.plan.sets).every(s => s.r >= rg.hi && (s.rir == null || s.rir >= (CFG.treatment ? 2 : 1)));
-    if (allTop && !exInfo(ex.id).assist) { ex.suggest = (st.w || 0) + stepFor(ex.id); hint = { k: "ac", t: shortName(ex.id) + ": все подходы на верхней границе — в следующий раз можно " + fmtW(ex.suggest) + " кг. Тренер подтвердит вечером." }; }
+    if (allTop && !exInfo(ex.id).assist) { ex.suggest = (st.w || 0) + stepFor(ex.id); hint = { k: "ac", t: shortName(ex.id) + ": все подходы на верхней границе — в следующий раз можно " + fmtW(ex.suggest) + " кг. Тренер подтвердит при разборе." }; }
     else if (allTop && exInfo(ex.id).assist) hint = { k: "ac", t: shortName(ex.id) + ": все подходы на верхней границе — в следующий раз противовес можно уменьшить на " + fmtW(stepFor(ex.id)) + " кг." };
   }
   ED.hint = hint; ED.init = false;
@@ -857,7 +860,7 @@ function viewSummary() {
   const w = HIST[LAST_DONE]; if (!w) return viewHome();
   const prs = [];
   (w.exercises || []).forEach(x => { if (!x.sets || !x.sets.length || exInfo(x.id).assist) return; const best = Math.max(...x.sets.map(e1rm)); const prev = doneWorkouts().filter(o => o.date < w.date || (o.date === w.date && o._id !== w._id && o.startedAt < w.startedAt)).flatMap(o => (o.exercises || []).filter(e => e.id === x.id).flatMap(e => e.sets || [])); if (prev.length && best > Math.max(...prev.map(e1rm)) + .01) prs.push(x.id); });
-  return '<main class="view"><div class="done-hero"><div class="medal">' + I.check + '</div><h1 class="lt">Тренировка ' + esc(w.type) + ' готова</h1><p class="muted" style="margin-top:8px">' + esc(fmtShort(w.date)) + " · отправлено тренеру. Разбор — сегодня в " + esc(CFG.coachTime) + ".</p></div>" +
+  return '<main class="view"><div class="done-hero"><div class="medal">' + I.check + '</div><h1 class="lt">Тренировка ' + esc(w.type) + ' готова</h1><p class="muted" style="margin-top:8px">' + esc(fmtShort(w.date)) + " · отправлено тренеру. Разбор — " + esc(coachWhen()) + ".</p></div>" +
     '<div class="grid3">' + stat("Время", w.duration + "<small>мин</small>", "") + stat("Подходов", setCount(w) + "", "") + stat("Тоннаж", fmtT(tonnage(w)).replace(/ (т|кг)$/, "<small>$1</small>"), "") + "</div>" +
     (prs.length ? '<div class="sec-h"><h2>Рекорды</h2></div><div class="list">' + prs.map(id => '<div class="row"><span class="badge A">' + I.up.replace("<svg", '<svg style="width:20px;height:20px"') + '</span><div class="grow"><div class="ttl">' + esc(exInfo(id).name) + '</div><div class="sub">лучше прошлых по расчётному максимуму</div></div></div>').join("") + "</div>" : "") +
     '<div class="sec-h"><h2>Упражнения</h2></div>' + workoutList(w) +
@@ -930,9 +933,9 @@ function md(t) {
   if (inList) h += "</ul>"; return h;
 }
 function viewCoach() {
-  let h = '<main class="view"><div class="top"><div><div class="eyebrow">разбор в ' + esc(CFG.coachTime) + '</div><h1 class="lt">Тренер</h1></div>' + syncPill() + "</div>";
+  let h = '<main class="view"><div class="top"><div><div class="eyebrow">разбор в ' + esc(COACH_TIME) + '</div><h1 class="lt">Тренер</h1></div>' + syncPill() + "</div>";
   if (COACH) h += '<article class="card"><div class="coach-head"><div class="avatar">' + I.coach + '</div><div><div class="t">' + esc(COACH.title || "Разбор") + '</div><div class="d">' + esc(COACH.date ? fmtShort(COACH.date) : "") + (COACH.workout ? " · тренировка " + esc(COACH.workout) : "") + '</div></div></div><div class="prose">' + md(COACH.text) + "</div></article>";
-  else h += '<div class="card"><div class="coach-head"><div class="avatar">' + I.coach + '</div><div><div class="t">Пока разборов нет</div><div class="d">первый появится после тренировки</div></div></div><p class="muted">Каждый вечер в ' + esc(CFG.coachTime) + " тренер смотрит новые тренировки: пишет вывод, ставит цели по весам и при необходимости правит программу. Всё это появится здесь и в Дневнике.</p></div>";
+  else h += '<div class="card"><div class="coach-head"><div class="avatar">' + I.coach + '</div><div><div class="t">Пока разборов нет</div><div class="d">первый появится после тренировки</div></div></div><p class="muted">Каждый день в ' + esc(COACH_TIME) + " тренер смотрит новые тренировки: пишет вывод, ставит цели по весам и при необходимости правит программу. Всё это появится здесь и в Дневнике.</p></div>";
   const tg = PROG.targets || {}; const ids = Object.keys(tg).sort((a, b) => String(tg[b].date || "").localeCompare(String(tg[a].date || "")));
   if (ids.length) {
     h += '<div class="sec-h"><h2>Цели по весам</h2></div><div class="list">' + ids.map(id => '<div class="row"><div class="grow"><div class="ttl">' + esc(exInfo(id).name) + '</div><div class="sub">' + (tg[id].note ? esc(tg[id].note) : "от " + esc(tg[id].date ? fmtShort(tg[id].date) : "")) + '</div></div><span class="chip ac num">' + (tg[id].w != null ? fmtW(tg[id].w) + " кг × " : "") + esc(tg[id].reps || "") + "</span></div>").join("") + "</div>";
@@ -966,7 +969,7 @@ function viewSettings() {
     '<div class="row"><div class="grow"><div class="ttl">Программа и разборы</div><div class="sub">' + (SYNC.lastPull ? "обновлено " + timeAgo(SYNC.lastPull) : "ещё не загружались") + (SYNC.err ? " · " + esc(errText(SYNC.err)) : "") + '</div></div><button class="btn sec sm" id="sPull">Обновить</button></div></div>' +
     '<div class="sec-h"><h2>Таймер отдыха</h2></div><div class="card"><div class="small muted" style="margin-bottom:8px">Базовые упражнения</div>' + restSeg("restBase", [90, 120, 150, 180]) + '<div class="small muted" style="margin:14px 0 8px">Изолирующие и суперсеты</div>' + restSeg("restIso", [60, 75, 90, 120]) + "</div>" +
     '<div class="sec-h"><h2>Во время тренировки</h2></div><div class="list">' + tg("sound", "Звук в конце отдыха", "работает, пока экран включён") + tg("haptics", "Вибрация") + tg("awake", "Не гасить экран", "экран не заблокируется во время тренировки") + tg("treatment", "Правила на время лечения", "запас 2–3 повтора, подсказки по ГЭРП, счётчик до ЭГДС") + "</div>" +
-    '<div class="sec-h"><h2>Тренер</h2></div><div class="card"><div class="ttl" style="font-weight:600">Разбор каждый день в ' + esc(CFG.coachTime) + '</div><p class="help" style="margin:6px 0 0">Если в этот день была тренировка, тренер её разберёт, обновит цели и Дневник. Чтобы поменять время, напиши в чате проекта «Зал»: «Разбор в 21:30».</p></div>' +
+    '<div class="sec-h"><h2>Тренер</h2></div><div class="card"><div class="ttl" style="font-weight:600">Разбор каждый день в ' + esc(COACH_TIME) + '</div><p class="help" style="margin:6px 0 0">Тренер разберёт все новые тренировки, обновит цели и Дневник. Чтобы поменять время, напиши в чате проекта «Зал»: «Разбор в 21:30».</p></div>' +
     '<div class="sec-h"><h2>Данные</h2></div><div class="list"><button class="row" id="sReload"><div class="grow"><div class="ttl">Перезагрузить приложение</div><div class="sub">если что-то выглядит странно</div></div>' + I.refresh.replace("<svg", '<svg class="chev"') + "</button></div>" +
     '<p class="foot">Модель мышц — BodyParts3D © The Database Center for Life Science, <a href="https://creativecommons.org/licenses/by-sa/2.1/jp/deed.en">CC BY-SA 2.1 JP</a>.<br>Схемы движений нарисованы для этого приложения.</p></main>';
 }
@@ -1000,7 +1003,7 @@ function bindSettings() {
    ================================================================ */
 function viewOnboarding() {
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-  return '<main class="onb"><img class="logo" src="icons/icon-180.png" alt=""><h1 class="lt">Зал</h1><p class="muted" style="font-size:17px;margin-top:8px">Записывай подходы прямо в зале. Тренер разберёт тренировку вечером.</p>' +
+  return '<main class="onb"><img class="logo" src="icons/icon-180.png" alt=""><h1 class="lt">Зал</h1><p class="muted" style="font-size:17px;margin-top:8px">Записывай подходы прямо в зале. Тренер разберёт тренировку и пришлёт цели на следующий раз.</p>' +
     (standalone ? "" : '<div class="hint ac" style="margin-top:18px">' + I.up + "<div>Сначала поставь значок: в Safari нажми <b>Поделиться</b> → <b>На экран «Домой»</b>, и открывай приложение оттуда.</div></div>") +
     '<ol class="steps" style="margin-top:22px"><li>На github.com открой <b>Settings → Developer settings → Fine-grained tokens</b> и нажми <b>Generate new token</b>.</li><li>Доступ: <b>Only select repositories → zal-data</b>. Права: <b>Contents — Read and write</b>.</li><li>Скопируй ключ и вставь ниже.</li></ol>' +
     '<label class="field"><span>Логин GitHub</span><input class="input" id="oOwner" autocapitalize="off" autocorrect="off" spellcheck="false" value="' + esc(CFG.owner) + '" placeholder="например, ivanov"></label>' +
