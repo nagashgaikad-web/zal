@@ -131,7 +131,7 @@ function viewCoach() {
   }
   const arch = COACH_ARCH.filter(c => !COACH || c.id !== COACH.id);
   if (arch.length) h += '<div class="sec-h"><h2>Прошлые разборы</h2></div><div class="list">' + arch.map((c, i) => '<button class="row" data-c="' + i + '"><div class="grow"><div class="ttl">' + esc(c.title || "Разбор") + '</div><div class="sub">' + esc(c.date ? fmtShort(c.date) : "") + "</div></div>" + I.chevR.replace("<svg", '<svg class="chev"') + "</button>").join("") + "</div>";
-  h += '<p class="help" style="margin-top:18px">Программа обновлена: ' + esc(PROG.updated ? fmtShort(PROG.updated) : "—") + (PROG.lastChange && PROG.lastChange.reason ? " — " + esc(PROG.lastChange.reason) : "") + ". Вопросы и изменения — в чате проекта «Зал».</p>';
+  h += '<p class="help" style="margin-top:18px">Программа обновлена: ' + esc(PROG.updated ? fmtShort(PROG.updated) : "—") + (PROG.lastChange && PROG.lastChange.reason ? " — " + esc(PROG.lastChange.reason) : "") + ". Вопросы и изменения — в чате проекта «Зал».</p>";
   return h + "</main>";
 }
 function bindCoach() {
