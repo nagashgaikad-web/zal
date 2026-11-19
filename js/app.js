@@ -2,7 +2,7 @@
    Хранит всё в телефоне и отправляет в закрытый репозиторий GitHub; тренер разбирает тренировку по расписанию. */
 (() => {
 "use strict";
-const VERSION = "1.0.2";
+const VERSION = "1.0.3";
 
 /* ---------------- утилиты ---------------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -70,7 +70,13 @@ const DEF_CFG = { owner: "", repo: "zal-data", token: "", branch: "main", api: "
 let CFG = Object.assign({}, DEF_CFG, LS.get("cfg", {}));
 const saveCfg = () => LS.set("cfg", CFG);
 let COACH_TIME = LS.get("coachTime", "14:00"); // время разбора — из zal-data/config.json
-function coachWhen() { const [h, m] = COACH_TIME.split(":").map(Number); const n = new Date(); return (n.getHours() * 60 + n.getMinutes() < h * 60 + m ? "сегодня" : "завтра") + " в " + COACH_TIME; }
+let COACH_TZ = LS.get("coachTz", "America/Whitehorse"); // часовой пояс разбора — как на ноутбуке, не на телефоне
+function coachWhen() {
+  const [h, m] = COACH_TIME.split(":").map(Number); let mins;
+  try { const p = new Intl.DateTimeFormat("en-GB", { timeZone: COACH_TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date()); mins = +p.find(x => x.type === "hour").value * 60 + +p.find(x => x.type === "minute").value; }
+  catch (_) { const n = new Date(); mins = n.getHours() * 60 + n.getMinutes(); }
+  return (mins < h * 60 + m ? "сегодня" : "завтра") + " в " + COACH_TIME;
+}
 const EGD_DATE = "2027-01-11"; // контрольная ЭГДС — не раньше этой даты
 
 /* ---------------- программа по умолчанию (копия Дневника, v6) ---------------- */
@@ -196,6 +202,7 @@ async function pull(opts = {}) {
   try {
     const [p, c, cf] = await Promise.all([GH.getJSON("program.json"), GH.getJSON("coach/latest.json"), GH.getJSON("config.json")]);
     if (cf && cf.data && cf.data.coachTime && cf.data.coachTime !== COACH_TIME) { COACH_TIME = cf.data.coachTime; LS.set("coachTime", COACH_TIME); changed = true; }
+    if (cf && cf.data && cf.data.tz && cf.data.tz !== COACH_TZ) { COACH_TZ = cf.data.tz; LS.set("coachTz", COACH_TZ); }
     if (p && p.data && JSON.stringify(p.data) !== JSON.stringify(PROG)) { PROG = p.data; LS.set("program", PROG); changed = true; }
     if (c && c.data && (!COACH || c.data.id !== COACH.id || c.data.date !== COACH.date)) {
       const isNew = !!COACH; COACH = c.data; LS.set("coach", COACH);
@@ -969,7 +976,7 @@ function viewSettings() {
     '<div class="row"><div class="grow"><div class="ttl">Программа и разборы</div><div class="sub">' + (SYNC.lastPull ? "обновлено " + timeAgo(SYNC.lastPull) : "ещё не загружались") + (SYNC.err ? " · " + esc(errText(SYNC.err)) : "") + '</div></div><button class="btn sec sm" id="sPull">Обновить</button></div></div>' +
     '<div class="sec-h"><h2>Таймер отдыха</h2></div><div class="card"><div class="small muted" style="margin-bottom:8px">Базовые упражнения</div>' + restSeg("restBase", [90, 120, 150, 180]) + '<div class="small muted" style="margin:14px 0 8px">Изолирующие и суперсеты</div>' + restSeg("restIso", [60, 75, 90, 120]) + "</div>" +
     '<div class="sec-h"><h2>Во время тренировки</h2></div><div class="list">' + tg("sound", "Звук в конце отдыха", "работает, пока экран включён") + tg("haptics", "Вибрация") + tg("awake", "Не гасить экран", "экран не заблокируется во время тренировки") + tg("treatment", "Правила на время лечения", "запас 2–3 повтора, подсказки по ГЭРП, счётчик до ЭГДС") + "</div>" +
-    '<div class="sec-h"><h2>Тренер</h2></div><div class="card"><div class="ttl" style="font-weight:600">Разбор каждый день в ' + esc(COACH_TIME) + '</div><p class="help" style="margin:6px 0 0">Тренер разберёт все новые тренировки, обновит цели и Дневник. Чтобы поменять время, напиши в чате проекта «Зал»: «Разбор в 21:30».</p></div>' +
+    '<div class="sec-h"><h2>Тренер</h2></div><div class="card"><div class="ttl" style="font-weight:600">Разбор каждый день в ' + esc(COACH_TIME) + '</div><p class="help" style="margin:4px 0 0">по времени ноутбука (UTC−7), а не телефона</p><p class="help" style="margin:6px 0 0">Тренер разберёт все новые тренировки, обновит цели и Дневник. Чтобы поменять время, напиши в чате проекта «Зал»: «Разбор в 21:30».</p></div>' +
     '<div class="sec-h"><h2>Данные</h2></div><div class="list"><button class="row" id="sReload"><div class="grow"><div class="ttl">Перезагрузить приложение</div><div class="sub">если что-то выглядит странно</div></div>' + I.refresh.replace("<svg", '<svg class="chev"') + "</button></div>" +
     '<p class="foot">Модель мышц — BodyParts3D © The Database Center for Life Science, <a href="https://creativecommons.org/licenses/by-sa/2.1/jp/deed.en">CC BY-SA 2.1 JP</a>.<br>Схемы движений нарисованы для этого приложения.</p></main>';
 }
