@@ -133,7 +133,7 @@ function figInit() {
   return FIG.ready;
 }
 function actFor(id) {
-  const a = ACT[id], load = {};
+  const e = exInfo(id), a = ACT[id] || (e.like && ACT[e.like]) || e.act, load = {};
   if (a) for (const k in a) { const al = ALIAS[k]; if (al) { for (const j in al) load[j] = Math.max(load[j] || 0, a[k] * al[j]); } else load[k] = Math.max(load[k] || 0, a[k]); }
   return load;
 }
@@ -182,16 +182,17 @@ async function takePhoto(id) {
 async function paintMedia(ex, blk) {
   const host = $("#media"); if (!host) return;
   const id = ex.id;
+  const aid = typeof ANIM !== "undefined" && !ANIM.has(id) && exInfo(id).anim && ANIM.has(exInfo(id).anim) ? exInfo(id).anim : id;
   const tabs = '<div class="mtabs">' + [["anim", "Движение"], ["mus", "Мышцы"], ["photo", "Фото"]].map(([k, l]) => '<button data-mt="' + k + '" aria-pressed="' + (MEDIA.tab === k) + '">' + l + "</button>").join("") + "</div>";
   const ssTag = blk.ss ? '<span class="ss-tag">Суперсет · ' + (SES.cur.e + 1) + "/" + blk.exs.length + "</span>" : "";
   let inner = "";
-  if (MEDIA.tab === "anim") inner = '<div id="anim" style="height:100%">' + (typeof ANIM !== "undefined" && ANIM.has(id) ? ANIM.frame(id, 0) : "") + "</div>";
+  if (MEDIA.tab === "anim") inner = '<div id="anim" style="height:100%">' + (typeof ANIM !== "undefined" && ANIM.has(aid) ? ANIM.frame(aid, 0) : "") + "</div>";
   else if (MEDIA.tab === "mus") inner = '<div class="figs" id="figs"></div>';
   else inner = '<div id="ph" style="height:100%"></div>';
   host.innerHTML = inner + ssTag + tabs;
   $$("[data-mt]", host).forEach(b => b.addEventListener("click", () => { MEDIA.tab = b.dataset.mt; haptic(); paintMedia(curEx(), curBlock()); }));
   stopAnim();
-  if (MEDIA.tab === "anim") startAnim(id);
+  if (MEDIA.tab === "anim") startAnim(aid);
   else if (MEDIA.tab === "mus") { try { const f = await figFor(id); const el = $("#figs"); if (el && curEx().id === id) el.innerHTML = '<img src="' + f.front + '" alt="Мышцы спереди" style="height:100%"><img src="' + f.back + '" alt="Мышцы сзади" style="height:100%">'; } catch (_) { const el = $("#figs"); if (el) el.innerHTML = '<div class="empty-photo">Не удалось загрузить рисунок</div>'; } }
   else {
     const el = $("#ph"); el.innerHTML = '<div class="empty-photo">Загружаю…</div>';
