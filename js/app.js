@@ -1,7 +1,7 @@
 /* Зал — загрузчик. Код приложения лежит частями в js/app/ (так его проще обновлять по одной части).
    Части склеиваются по порядку в один скрипт — ровно как раньше был один файл app.js. */
 (() => {
-  const V = "5";
+  const V = "6";
   const PARTS = ["1-core", "2-home", "3-editor-rest", "4-workout", "5-finish-history", "6-settings-start"];
   const fail = e => {
     console.error("zal loader", e);

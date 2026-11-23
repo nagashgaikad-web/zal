@@ -1,1 +1,34 @@
-PLACEHOLDER
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#07090C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Зал">
+<meta name="format-detection" content="telephone=no">
+<title>Зал</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="stylesheet" href="app.css?v=4">
+<style>/* v1.0.4: переход к следующему упражнению — оранжевый таймер */
+:root{--move:#FFB547;--move-soft:rgba(255,181,71,.16)}
+.rest.kx .top2 b{color:var(--move)}.rest.kx .fgc{stroke:var(--move)}.rest.kx .panel{border-color:rgba(255,181,71,.35)}
+.rest.kx .minic .num{color:var(--move)}.rest.kx .minic .bar{background:rgba(255,181,71,.15)}.rest.kx .minic .bar i{background:var(--move)}
+.rest.kx .chip.cy{background:var(--move-soft);color:var(--move)}
+.rest.kx.over .fgc{stroke:var(--ac)}.rest.kx.over .top2 b,.rest.kx.over .minic .num{color:var(--ac)}.rest.kx.over .minic .bar i{background:var(--ac)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="layer"></div>
+<label id="hapt" hidden><input type="checkbox" switch></label>
+<script src="js/catalog.js?v=4"></script>
+<script src="js/anim.js?v=4"></script>
+<script src="js/figdata.js?v=4"></script>
+<script src="js/app.js?v=6"></script>
+</body>
+</html>

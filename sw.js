@@ -1,6 +1,6 @@
 /* Офлайн-оболочка приложения. Запросы к GitHub API не кэшируются. */
-const CACHE = "zal-v1.0.4";
-const SHELL = ["./", "index.html", "app.css?v=4", "js/catalog.js?v=4", "js/anim.js?v=4", "js/app.js?v=5", "js/app/1-core.js?v=5", "js/app/2-home.js?v=5", "js/app/3-editor-rest.js?v=5", "js/app/4-workout.js?v=5", "js/app/5-finish-history.js?v=5", "js/app/6-settings-start.js?v=5", "manifest.webmanifest",
+const CACHE = "zal-v1.0.5";
+const SHELL = ["./", "index.html", "app.css?v=4", "js/catalog.js?v=4", "js/anim.js?v=4", "js/app.js?v=6", "js/app/1-core.js?v=6", "js/app/2-home.js?v=6", "js/app/3-editor-rest.js?v=6", "js/app/4-workout.js?v=6", "js/app/5-finish-history.js?v=6", "js/app/6-settings-start.js?v=6", "manifest.webmanifest",
   "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png", "js/figdata.js?v=4"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
