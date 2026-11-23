@@ -160,13 +160,30 @@ function openHeartburn() {
 }
 function openReplace() {
   const ex = curEx(); const cur = new Set(flatExs(SES).map(x => x.ex.id));
-  const ids = Object.keys(EX).concat(Object.keys(PROG.custom || {})).filter(id => !exInfo(id).cardio && id !== ex.id && id !== "pendulum");
-  const alts = ["goblet", "reverse_lunge", "bulgarian"].filter(id => ids.includes(id));
-  const sorted = alts.concat(ids.filter(id => !alts.includes(id)).sort((a, b) => exInfo(a).name.localeCompare(exInfo(b).name, "ru")));
-  openSheet('<div class="sh-top"><h2>Заменить на…</h2><button class="icon-btn" data-close>' + I.x + '</button></div><p class="muted small" style="margin-bottom:10px">Тренажёр занят или его нет. Подходы и повторы останутся из плана.</p><div class="list">' +
-    sorted.map(id => '<button class="row" data-id="' + esc(id) + '"><div class="grow"><div class="ttl">' + esc(exInfo(id).name) + '</div><div class="sub">' + esc((exInfo(id).prim || []).map(m => MUS_NAME[m] || m).join(", ")) + (cur.has(id) ? " · уже есть сегодня" : "") + (alts.includes(id) ? " · замена при дискомфорте" : "") + "</div></div>" + I.chevR.replace("<svg", '<svg class="chev"') + "</button>").join("") + "</div>",
+  const orig = ex.replacedFrom || ex.id;
+  const same = id => !!exInfo(id).cardio === !!ex.cardio;
+  const rec = altsFor(orig).filter(id => id !== ex.id && same(id));
+  if (orig !== ex.id) rec.unshift(orig);
+  const all = Object.keys(EX).concat(Object.keys(PROG.custom || {})).filter((id, i, arr) => arr.indexOf(id) === i && same(id) && id !== ex.id && id !== "pendulum" && !rec.includes(id))
+    .sort((x, y) => exInfo(x).name.localeCompare(exInfo(y).name, "ru"));
+  const mus = id => (exInfo(id).prim || []).map(m => MUS_NAME[m] || m).join(", ");
+  const tip1 = id => { const t = String(exInfo(id).tip || ""); const i = t.indexOf(". "); return i > 0 ? t.slice(0, i + 1) : t; };
+  const row = (id, full) => '<button class="row" data-id="' + esc(id) + '"><div class="grow"><div class="ttl">' + esc(exInfo(id).name) + '</div><div class="sub">' +
+    (id === orig && orig !== ex.id ? "вернуть исходное · " : "") + esc(mus(id)) + (cur.has(id) && id !== orig ? " · уже есть сегодня" : "") + "</div>" +
+    (full && tip1(id) ? '<div class="sub">' + esc(tip1(id)) + "</div>" : "") + "</div>" + I.chevR.replace("<svg", '<svg class="chev"') + "</button>";
+  const allHTML = '<div class="sec-h"><h2>Все упражнения</h2></div><div class="list">' + all.map(id => row(id, false)).join("") + "</div>";
+  openSheet('<div class="sh-top"><h2>Заменить на…</h2><button class="icon-btn" data-close>' + I.x + '</button></div>' +
+    (rec.length
+      ? '<p class="muted small" style="margin-bottom:10px">Тренажёр занят — замены на те же мышцы. Подходы и повторы останутся из плана.</p><div class="list">' + rec.map(id => row(id, true)).join("") + "</div>" +
+        '<button class="btn sec" id="rpAll" style="margin-top:14px">Показать все упражнения</button><div id="rpAllList" hidden>' + allHTML + "</div>"
+      : '<p class="muted small" style="margin-bottom:10px">Для этого упражнения нет готовых замен — выбери из списка. Подходы и повторы останутся из плана.</p>' + allHTML),
     sh => { $("[data-close]", sh).addEventListener("click", () => closeSheet());
-      $$("[data-id]", sh).forEach(b => b.addEventListener("click", () => { const to = b.dataset.id; SES.replaced.push({ from: ex.id, to }); ex.replacedFrom = ex.id; ex.id = to; ex.sets = []; ED.idx = null; ED.init = false; ED.hint = null; MEDIA.lastKey = null; saveSes(true); closeSheet(); toast("Заменено: " + exInfo(to).name); })); });
+      const btn = $("#rpAll", sh); if (btn) btn.addEventListener("click", () => { $("#rpAllList", sh).hidden = false; btn.remove(); });
+      $$("[data-id]", sh).forEach(b => b.addEventListener("click", () => { const to = b.dataset.id;
+        SES.replaced = (SES.replaced || []).filter(r => r.from !== orig);
+        if (to === orig) { delete ex.replacedFrom; } else { SES.replaced.push({ from: orig, to }); ex.replacedFrom = orig; }
+        ex.id = to; ex.sets = []; ED.idx = null; ED.init = false; ED.hint = null; MEDIA.lastKey = null; saveSes(true); closeSheet();
+        toast((to === orig ? "Вернул: " : "Заменено: ") + exInfo(to).name); })); });
 }
 function openPlan() {
   const all = flatExs(SES);
