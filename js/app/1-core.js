@@ -2,7 +2,7 @@
    Хранит всё в телефоне и отправляет в закрытый репозиторий GitHub; тренер разбирает тренировку по расписанию. */
 (() => {
 "use strict";
-const VERSION = "1.0.4";
+const VERSION = "1.0.5";
 
 /* ---------------- утилиты ---------------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -96,10 +96,12 @@ const COMPOUND = new Set(["bulgarian","leg_press","pendulum","goblet","reverse_l
 const DUMBBELL = new Set(["incline_db","hammer","incline_curl","bulgarian","goblet","reverse_lunge"]);
 const STEP = { leg_press: 5, bb_curl: 2.5, reverse_curl: 2.5, wrist_curl: 2.5 };
 const exInfo = id => EX[id] || (PROG.custom && PROG.custom[id]) || { name: id, prim: [], sec: [] };
-const stepFor = id => STEP[id] || (DUMBBELL.has(id) ? 1 : 2.5);
-const restFor = id => COMPOUND.has(id) ? CFG.restBase : CFG.restIso;
+const isDb = id => DUMBBELL.has(id) || !!exInfo(id).db;
+const altsFor = id => ((PROG.alts && PROG.alts[id]) || []).filter(x => EX[x] || (PROG.custom && PROG.custom[x]));
+const stepFor = id => STEP[id] || (isDb(id) ? 1 : 2.5);
+const restFor = id => COMPOUND.has(id) || exInfo(id).compound ? CFG.restBase : CFG.restIso;
 const e1rm = s => s.w * (1 + s.r / 30);
-const unitNote = id => exInfo(id).assist ? "противовес · меньше = тяжелее" : DUMBBELL.has(id) ? "вес одной гантели" : exInfo(id).perSide ? "на каждую ногу" : "";
+const unitNote = id => exInfo(id).assist ? "противовес · меньше = тяжелее" : isDb(id) && !exInfo(id).perSide ? "вес одной гантели" : exInfo(id).perSide ? (exInfo(id).side || "на каждую ногу") + (isDb(id) ? " · вес одной гантели" : "") : "";
 
 /* ---------------- история ---------------- */
 const doneWorkouts = () => Object.values(HIST).filter(w => w && w.date && w.status !== "active" && w.status !== "deleted").sort((a, b) => (a.date + (a.startedAt || "")).localeCompare(b.date + (b.startedAt || "")));
@@ -113,7 +115,7 @@ function nextType() {
   const last = ws[ws.length - 1].type; const order = ["A", "B", "C"]; const i = order.indexOf(last);
   return i < 0 ? "A" : order[(i + 1) % 3];
 }
-const tonnage = w => (w.exercises || []).reduce((t, x) => t + (x.sets || []).reduce((s, st) => s + (exInfo(x.id).assist ? 0 : (st.w || 0) * (st.r || 0) * (exInfo(x.id).perSide ? 2 : 1) * (DUMBBELL.has(x.id) && !exInfo(x.id).perSide ? 2 : 1)), 0), 0);
+const tonnage = w => (w.exercises || []).reduce((t, x) => t + (x.sets || []).reduce((s, st) => s + (exInfo(x.id).assist ? 0 : (st.w || 0) * (st.r || 0) * (exInfo(x.id).perSide ? 2 : 1) * (isDb(x.id) && !exInfo(x.id).perSide ? 2 : 1)), 0), 0);
 const setCount = w => (w.exercises || []).reduce((t, x) => t + (x.sets ? x.sets.length : 0), 0);
 const fmtT = kg => kg >= 1000 ? (Math.round(kg / 100) / 10).toString().replace(".", ",") + " т" : Math.round(kg) + " кг";
 
@@ -230,4 +232,3 @@ async function pull(opts = {}) {
   if (changed && !opts.noRender && VIEW.name !== "workout") render();
   return changed;
 }
-
